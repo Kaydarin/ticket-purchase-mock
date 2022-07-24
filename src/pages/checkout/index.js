@@ -16,8 +16,11 @@ import {
     Select,
     Input
 } from '@chakra-ui/react';
+import { useNavigate } from "react-router-dom";
 
 function Checkout() {
+
+    const navigate = useNavigate();
 
     return (
         <Flex justifyContent='space-between' textAlign='left' gap='5'>
@@ -157,6 +160,7 @@ function Checkout() {
                                 colorScheme='gray'
                                 variant='outline'
                                 size='lg'
+                                onClick={() => navigate("/success", { replace: true })}
                             >
                                 Pay
                             </Button>

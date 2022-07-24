@@ -12,8 +12,11 @@ import {
     Image,
     Stack
 } from '@chakra-ui/react';
+import { useNavigate } from "react-router-dom";
 
 function List() {
+
+    const navigate = useNavigate();
 
     return (
         <>
@@ -67,6 +70,7 @@ function List() {
                         colorScheme='gray'
                         variant='outline'
                         size='lg'
+                        onClick={() => navigate("/checkout")}
                     >
                         Checkout
                     </Button>
