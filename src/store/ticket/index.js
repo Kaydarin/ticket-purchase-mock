@@ -41,6 +41,31 @@ const initialState = {
 export const ticket = createSlice({
     name: 'ticket',
     initialState,
+    reducers: {
+        setTicketQuantity: (state, { payload }) => {
+            const ticketList = [...state.list];
+            const ticketIndex = ticketList.findIndex(obj => obj.id === payload.id);
+
+            if (ticketIndex !== -1 && !isNaN(payload.value)) {
+                ticketList[ticketIndex].quantity = payload.value;
+            }
+
+
+            state.list = ticketList;
+        },
+        resetQuantity: (state) => {
+            let ticketList = [...state.list];
+
+            ticketList = ticketList.map(ticket => ({
+                ...ticket,
+                quantity: 0
+            }));
+
+            state.list = ticketList;
+        }
+    },
 });
+
+export const { setTicketQuantity, resetQuantity } = ticket.actions;
 
 export default ticket;

@@ -1,4 +1,7 @@
-import React from 'react';
+import React, { useCallback, useRef } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from "react-router-dom";
+import { setTicketOrderQuantity, removeTicketOrder, submitOrder, resetOrder } from '../../store/order';
 import {
     Divider,
     Flex,
@@ -14,13 +17,104 @@ import {
     FormControl,
     FormLabel,
     Select,
-    Input
+    Input,
+    useToast,
 } from '@chakra-ui/react';
-import { useNavigate } from "react-router-dom";
 
 function Checkout() {
 
     const navigate = useNavigate();
+    const dispatch = useDispatch();
+    const dispatcher = useCallback(cb => dispatch(cb), [dispatch])
+    const toast = useToast();
+    const formRef = useRef();
+
+    const { cart, paymentMethod, totalTaxRate, total } = useSelector(state => {
+
+        const cart = state.order.cart;
+        const paymentMethod = state.order.paymentMethod;
+        const taxRate = state.order.taxRate;
+
+        const totalTaxRate = cart.reduce((accummulate, obj) => {
+            return accummulate + (taxRate * obj.quantity)
+        }, 0);
+        const total = cart.reduce((accummulate, obj) => {
+            return accummulate + (obj.price * obj.quantity)
+        }, 0) + totalTaxRate;
+
+        return {
+            paymentMethod,
+            cart,
+            totalTaxRate,
+            total
+        }
+    });
+
+    const pay = async () => {
+
+        let paymentMethod;
+        let cardNo;
+        let cardExpiry;
+        let cardCCV;
+
+        for (let i = 0; i < formRef.current.length; i++) {
+
+            const fieldName = formRef.current[i].name;
+            const fieldValue = formRef.current[i].value;
+
+            switch (fieldName) {
+                case 'payment_method':
+                    paymentMethod = fieldValue;
+                    break;
+                case 'card_no':
+                    cardNo = fieldValue;
+                    break;
+                case 'card_expiry':
+                    cardExpiry = fieldValue;
+                    break;
+                case 'card_ccv':
+                    cardCCV = fieldValue;
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        console.log(paymentMethod === '')
+
+        if (
+            paymentMethod === '' ||
+            cardNo === '' ||
+            cardExpiry === '' ||
+            cardCCV === ''
+        ) {
+            toast({
+                title: `Opps! You haven't filled up payment info!`,
+                status: 'error',
+                isClosable: true,
+            });
+        } else {
+
+            const res = await dispatcher(submitOrder({
+                paymentMethod,
+                cardNo,
+                cardExpiry,
+                cardCCV,
+            }))
+
+            if (res.meta.requestStatus === 'fulfilled') {
+                dispatcher(resetOrder())
+                navigate("/success", { replace: true })
+            } else {
+                toast({
+                    title: 'Opps! Something Wrong!',
+                    status: 'error',
+                    isClosable: true,
+                });
+            }
+        }
+
+    }
 
     return (
         <Flex justifyContent='space-between' textAlign='left' gap='5'>
@@ -33,48 +127,67 @@ function Checkout() {
                         }}>Tickets</div>
                         <Divider margin='5px 0 20px 0' />
                         <Stack spacing={6}>
-                            <Box borderWidth='1px' borderRadius='lg' overflow='hidden' p='5' borderColor='#E2E8F0' width='100%' textAlign='left'>
-                                <Flex justifyContent='space-between' alignItems='center'>
-                                    <Box w='100%'>
-                                        <Flex justifyContent='space-between' alignItems='center' w='100%'>
-                                            <Image
-                                                borderRadius='lg'
-                                                boxSize='100px'
-                                                src='https://www.syracuse.com/resizer/0X7L9GNUtqQj6TppSRkDIjK6mEc=/1280x0/smart/cloudfront-us-east-1.images.arcpublishing.com/advancelocal/NPKVVKP6PBEWRISW7FTSWEK2QM.jpg'
-                                            />
-                                            <Flex flexDirection='column' w='100%' paddingX='20px'>
-                                                <Box>
-                                                    <Flex justifyContent='space-between'>
-                                                        <div style={{
-                                                            fontSize: 20,
-                                                            fontWeight: 700
-                                                        }}>Foo Fighters</div>
-                                                        <div>Price: RM 9999.99</div>
+                            {
+                                cart && cart.length <= 0 ? (
+                                    <div>You have nothing in cart.</div>
+                                ) : cart.map((ticket, index) => (
+                                    <Box key={index} borderWidth='1px' borderRadius='lg' overflow='hidden' p='5' borderColor='#E2E8F0' width='100%' textAlign='left'>
+                                        <Flex justifyContent='space-between' alignItems='center'>
+                                            <Box w='100%'>
+                                                <Flex justifyContent='space-between' alignItems='center' w='100%'>
+                                                    <Image
+                                                        borderRadius='lg'
+                                                        boxSize='100px'
+                                                        src={ticket.img}
+                                                    />
+                                                    <Flex flexDirection='column' w='100%' paddingX='20px'>
+                                                        <Box>
+                                                            <Flex justifyContent='space-between'>
+                                                                <div style={{
+                                                                    fontSize: 20,
+                                                                    fontWeight: 700
+                                                                }}>{ticket.title}</div>
+                                                                <div>Price: {ticket.currency === 'MYR' ? 'RM' : '$'} {ticket.price.toFixed(2)}</div>
+                                                            </Flex>
+                                                        </Box>
+                                                        <Divider marginY='5px' />
+                                                        <div>Date: {ticket.startDate} - {ticket.endDate}</div>
+                                                        <div>Venue: {ticket.venue}</div>
                                                     </Flex>
+                                                </Flex>
+                                            </Box>
+
+                                            <Flex flexDirection='column' justifyContent='space-between' alignItems='center' maxWidth={150}>
+                                                <Box marginBottom='10px'>
+                                                    <NumberInput
+                                                        defaultValue={ticket.quantity}
+                                                        value={ticket.quantity}
+                                                        min={0}
+                                                        max={500}
+                                                        onChange={(val) => dispatcher(setTicketOrderQuantity({
+                                                            id: ticket.id,
+                                                            value: parseInt(val)
+                                                        }))}
+                                                    >
+                                                        <NumberInputField />
+                                                        <NumberInputStepper>
+                                                            <NumberIncrementStepper />
+                                                            <NumberDecrementStepper />
+                                                        </NumberInputStepper>
+                                                    </NumberInput>
                                                 </Box>
-                                                <Divider marginY='5px' />
-                                                <div>Date: 1 Feb 2022 - 30 Dec 2022</div>
-                                                <div>Features: Dave Grohl, Taylor Hawkins, etc. </div>
+                                                <Button
+                                                    colorScheme='gray'
+                                                    variant='ghost'
+                                                    width='100%'
+                                                    onClick={() => dispatcher(removeTicketOrder(index))}
+                                                >
+                                                    Remove
+                                                </Button>
                                             </Flex>
                                         </Flex>
                                     </Box>
-
-                                    <Flex flexDirection='column' justifyContent='space-between' alignItems='center' maxWidth={150}>
-                                        <Box marginBottom='10px'>
-                                            <NumberInput defaultValue={0} min={0} max={500}>
-                                                <NumberInputField />
-                                                <NumberInputStepper>
-                                                    <NumberIncrementStepper />
-                                                    <NumberDecrementStepper />
-                                                </NumberInputStepper>
-                                            </NumberInput>
-                                        </Box>
-                                        <Button colorScheme='gray' variant='ghost' width='100%'>
-                                            Remove
-                                        </Button>
-                                    </Flex>
-                                </Flex>
-                            </Box>
+                                ))}
                         </Stack>
                     </Box>
                     <Box>
@@ -91,30 +204,34 @@ function Checkout() {
                                     marginBottom: 10
                                 }}>Payment Method</div>
                                 <Box borderWidth='1px' borderRadius='lg' overflow='hidden' p='5' borderColor='#E2E8F0' width='100%' textAlign='left'>
-                                    <Stack spacing={3}>
-                                        <FormControl>
-                                            <FormLabel>Methods</FormLabel>
-                                            <Select placeholder='Select payment method'>
-                                                <option value='visa'>Visa</option>
-                                                <option value='mastercard'>MasterCard</option>
-                                            </Select>
-                                        </FormControl>
-                                        <FormControl>
-                                            <FormLabel>Card Number</FormLabel>
-                                            <Input placeholder='Enter card number' />
-                                        </FormControl>
-                                        <FormControl>
-                                            <FormLabel>Card Expiry</FormLabel>
+                                    <form ref={formRef}>
+                                        <Stack spacing={3}>
+                                            <FormControl>
+                                                <FormLabel>Methods</FormLabel>
+                                                <Select placeholder='Select payment method' name='payment_method'>
+                                                    {
+                                                        paymentMethod && paymentMethod.map((payment, index) => (
+                                                            <option key={index} value={payment.id}>{payment.name}</option>
+                                                        ))
+                                                    }
+                                                </Select>
+                                            </FormControl>
+                                            <FormControl>
+                                                <FormLabel>Card Number</FormLabel>
+                                                <Input placeholder='Enter card number' name='card_no' />
+                                            </FormControl>
                                             <Flex gap={5}>
-                                                <NumberInput min={1} max={12} w='100%'>
-                                                    <NumberInputField placeholder='Month' />
-                                                </NumberInput>
-                                                <NumberInput min={2000} max={3000} w='100%'>
-                                                    <NumberInputField placeholder='Year' />
-                                                </NumberInput>
+                                                <FormControl>
+                                                    <FormLabel>Card Expiry</FormLabel>
+                                                    <Input placeholder='Ex; 01/2022' name='card_expiry' />
+                                                </FormControl>
+                                                <FormControl>
+                                                    <FormLabel>Card CCV</FormLabel>
+                                                    <Input placeholder='Enter card CCV' name='card_ccv' />
+                                                </FormControl>
                                             </Flex>
-                                        </FormControl>
-                                    </Stack>
+                                        </Stack>
+                                    </form>
                                 </Box>
                             </Box>
                         </Stack>
@@ -134,36 +251,55 @@ function Checkout() {
                         marginBottom: 10
                     }}>Tickets</div>
                     <Stack spacing={1} marginBottom='30px'>
-                        <Flex justifyContent='space-between'>
-                            <div>Foo Fighters (x2)</div>
-                            <div>RM 99.99</div>
-                        </Flex>
-                        <Flex justifyContent='space-between'>
-                            <div>Foo Fighters (x2)</div>
-                            <div>RM 99.99</div>
-                        </Flex>
+                        {
+                            cart && cart.map((ticket, index) => {
+                                if (ticket.quantity > 0) {
+                                    return (
+                                        <Flex key={index} justifyContent='space-between'>
+                                            <div>{ticket.title} (x{ticket.quantity})</div>
+                                            <div>{ticket.currency === 'MYR' ? 'RM' : '$'} {(ticket.price * ticket.quantity).toFixed(2)}</div>
+                                        </Flex>
+                                    )
+                                } else {
+                                    return <></>
+                                }
+                            })
+                        }
                     </Stack>
                     <Flex justifyContent='space-between'>
                         <div>Tax</div>
-                        <div>RM 99.99</div>
+                        <div>RM {totalTaxRate.toFixed(2)}</div>
                     </Flex>
                     <Flex justifyContent='space-between'>
                         <div>Total</div>
                         <div style={{
                             fontWeight: 700
-                        }}>RM 99999.99</div>
+                        }}>RM {total.toFixed(2)}</div>
                     </Flex>
                     <Divider />
                     <Flex justifyContent='right'>
                         <Box marginTop='20px'>
-                            <Button
-                                colorScheme='gray'
-                                variant='outline'
-                                size='lg'
-                                onClick={() => navigate("/success", { replace: true })}
-                            >
-                                Pay
-                            </Button>
+                            {
+                                cart && cart.length <= 0 ? (
+                                    <Button
+                                        colorScheme='gray'
+                                        variant='outline'
+                                        size='lg'
+                                        onClick={() => navigate(-1)}
+                                    >
+                                        Go Back
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        colorScheme='gray'
+                                        variant='outline'
+                                        size='lg'
+                                        onClick={() => pay()}
+                                    >
+                                        Pay
+                                    </Button>
+                                )
+                            }
                         </Box>
                     </Flex>
                 </Box>
