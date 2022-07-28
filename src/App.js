@@ -1,4 +1,5 @@
 import React from 'react';
+import { useSelector } from 'react-redux';
 import { BrowserRouter, Routes, Route, Navigate, NavLink } from "react-router-dom";
 import {
     Heading,
@@ -17,28 +18,57 @@ import Success from './pages/success';
 
 function App() {
 
+    const { username } = useSelector(state => state.app);
+    const { cart, totalCart } = useSelector(state => {
+
+        const cart = state.order.cart;
+
+        const totalCart = cart.reduce((accummulate, obj) => {
+            return accummulate + obj.quantity;
+        }, 0);
+
+        return {
+            cart,
+            totalCart
+        }
+    });
+
+    const goToCart = (e) => {
+        if (cart.length <= 0) {
+            e.preventDefault()
+        }
+    }
+
     return (
         <BrowserRouter>
             <Container maxW='80%' paddingY='20px'>
                 <Flex alignItems='center'>
-                    <Heading size='sm' >Ticket Purchase Mock</Heading>
+                    <NavLink
+                        to="/"
+                    >
+                        <Heading size='sm' >Ticket Purchase Mock</Heading>
+                    </NavLink>
                     <Spacer />
                     <Box>
                         <Flex alignItems='center'>
-                            <Box marginX='20px'>Hi John Doe!</Box>
+                            <Box marginX='20px'>Hi {username}!</Box>
                             <Box borderWidth='1px' borderRadius='xl' overflow='hidden' p='2' borderColor='#E2E8F0'>
                                 <Flex minWidth={100} alignItems='center' justifyContent='space-around'>
-                                    <NavLink to="checkout">
+                                    <NavLink
+                                        to="checkout"
+                                        onClick={goToCart}
+                                    >
                                         <IconButton
                                             aria-label='cart'
                                             icon={<FaShoppingCart />}
                                             colorScheme='gray'
                                             variant='ghost'
+                                            disabled={cart.length <= 0}
                                         />
                                     </NavLink>
                                     <div>
                                         <Tag variant='outline' colorScheme='teal'>
-                                            999
+                                            {totalCart}
                                         </Tag>
                                     </div>
                                 </Flex>
