@@ -17,7 +17,7 @@ function Success() {
                         fontWeight: 700
                     }}>Payment Success!</div>
                     <Icon as={FaRegCheckCircle} boxSize={40} color='teal' />
-                    <div>
+                    <div style={{ textAlign: 'center' }}>
                         We will send the tickets to your email along with the receipt.
                     </div>
                 </Stack>
